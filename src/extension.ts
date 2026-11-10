@@ -1,53 +1,39 @@
-// Commit Reminder — плагин для VS Code
-// Напоминает сделать коммит, если накопилось много изменённых файлов,
-// и собирает статистику (сколько было напоминаний, коммитов и т.д.)
-
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
 
-// ---------- Типы данных ----------
-
-// Статистика за один день
 interface DayStats {
-    reminders: number;     // сколько раз показали напоминание
-    commits: number;       // сколько коммитов заметили
-    snoozes: number;       // сколько раз нажали «Отложить»
-    commitClicks: number;  // сколько раз нажали «Перейти к коммиту»
+    reminders: number;
+    commits: number;
+    snoozes: number;
+    commitClicks: number;
 }
 
-// Вся статистика
 interface Stats {
-    days: { [date: string]: DayStats };  // ключ — дата "ГГГГ-ММ-ДД"
-    commitsByHour: number[];             // 24 числа: коммиты по часам
-    maxChangedFiles: number;             // рекорд изменённых файлов
+    days: { [date: string]: DayStats };
+    commitsByHour: number[];
+    maxChangedFiles: number;
 }
 
-// Описание настройки для меню «Быстрые настройки»
 interface QuickSetting {
     key: string;
     label: string;
     type: 'boolean' | 'number' | 'string' | 'enum';
-    values?: string[];  // варианты, только для enum
+    values?: string[];
 }
 
-// ---------- Глобальные переменные ----------
-
-let checkTimer: NodeJS.Timeout | undefined;    // таймер напоминаний
-let statusTimer: NodeJS.Timeout | undefined;   // таймер строки состояния
+let checkTimer: NodeJS.Timeout | undefined;
+let statusTimer: NodeJS.Timeout | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
-let snoozeUntil = 0;                // до какого времени напоминания отложены
-let lastHead: string | null = null; // последний известный коммит (HEAD)
+let snoozeUntil = 0;
+let lastHead: string | null = null;
 let lastCommitTime = Date.now();
-let lastSaveCheck = 0;              // когда последний раз проверяли при сохранении
+let lastSaveCheck = 0;
 let extContext: vscode.ExtensionContext;
-
-// ---------- Вспомогательные функции ----------
 
 function getConfig(): vscode.WorkspaceConfiguration {
     return vscode.workspace.getConfiguration('commitReminder');
 }
 
-// Путь к первой открытой папке
 function getFolder(): string | null {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
@@ -56,7 +42,6 @@ function getFolder(): string | null {
     return folders[0].uri.fsPath;
 }
 
-// Запускает команду git и возвращает её вывод (или null, если ошибка)
 function runGit(args: string): Promise<string | null> {
     return new Promise((resolve) => {
         const folder = getFolder();
@@ -74,7 +59,6 @@ function runGit(args: string): Promise<string | null> {
     });
 }
 
-// Считает число изменённых файлов. Возвращает -1, если это не git-репозиторий
 async function getChangedFilesCount(): Promise<number> {
     const output = await runGit('status --porcelain');
     if (output === null) {
@@ -85,21 +69,17 @@ async function getChangedFilesCount(): Promise<number> {
     }
     let lines = output.split('\n');
     if (!getConfig().get<boolean>('countUntrackedFiles')) {
-        // строки, начинающиеся с ??, — это новые файлы
         lines = lines.filter(line => !line.startsWith('??'));
     }
     return lines.length;
 }
 
-// Дата в виде строки ГГГГ-ММ-ДД
 function dateKey(date: Date): string {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return y + '-' + m + '-' + d;
 }
-
-// ---------- Статистика ----------
 
 function emptyStats(): Stats {
     return {
@@ -117,7 +97,6 @@ function saveStats(stats: Stats): void {
     extContext.globalState.update('stats', stats);
 }
 
-// Увеличивает счётчик name за сегодня
 function addStat(name: keyof DayStats): void {
     if (!getConfig().get<boolean>('collectStatistics')) {
         return;
@@ -145,8 +124,6 @@ function updateMaxChanged(count: number): void {
     }
 }
 
-// ---------- Проверка, можно ли сейчас напоминать ----------
-
 function isGoodTimeToRemind(): boolean {
     const config = getConfig();
     const now = new Date();
@@ -155,7 +132,7 @@ function isGoodTimeToRemind(): boolean {
         return false;
     }
     if (config.get<boolean>('ignoreWeekends')) {
-        const day = now.getDay(); // 0 — воскресенье, 6 — суббота
+        const day = now.getDay();
         if (day === 0 || day === 6) {
             return false;
         }
@@ -171,22 +148,17 @@ function isGoodTimeToRemind(): boolean {
     return true;
 }
 
-// ---------- Отслеживание коммитов ----------
-
 async function checkForNewCommit(): Promise<void> {
     const head = await runGit('rev-parse HEAD');
     if (head === null) {
         return;
     }
     if (lastHead !== null && head !== lastHead) {
-        // HEAD поменялся — значит, был сделан коммит
         addStat('commits');
         lastCommitTime = Date.now();
     }
     lastHead = head;
 }
-
-// ---------- Строка состояния ----------
 
 function createStatusBar(): void {
     if (statusBarItem) {
@@ -232,8 +204,6 @@ async function updateStatusBar(): Promise<void> {
         statusBarItem.backgroundColor = undefined;
     }
 }
-
-// ---------- Само напоминание ----------
 
 async function checkAndRemind(manual: boolean): Promise<void> {
     const config = getConfig();
@@ -304,8 +274,6 @@ function snooze(): void {
     updateStatusBar();
 }
 
-// ---------- Таймеры ----------
-
 function startTimers(): void {
     stopTimers();
     const config = getConfig();
@@ -326,8 +294,6 @@ function stopTimers(): void {
         statusTimer = undefined;
     }
 }
-
-// ---------- Быстрые настройки (через QuickPick) ----------
 
 const quickSettingsList: QuickSetting[] = [
     { key: 'enabled', label: 'Напоминания включены', type: 'boolean' },
@@ -353,7 +319,6 @@ const quickSettingsList: QuickSetting[] = [
     { key: 'chartColorCommits', label: 'Цвет «коммитов» на графике', type: 'string' }
 ];
 
-// Пункт списка: обычный QuickPickItem + ссылка на настройку
 interface SettingItem extends vscode.QuickPickItem {
     setting: QuickSetting | null;
 }
@@ -382,7 +347,7 @@ async function showQuickSettings(): Promise<void> {
     let newValue: boolean | number | string | undefined;
 
     if (s.type === 'boolean') {
-        newValue = !config.get<boolean>(s.key); // просто переключаем
+        newValue = !config.get<boolean>(s.key);
     } else if (s.type === 'enum') {
         newValue = await vscode.window.showQuickPick(s.values ?? [], { placeHolder: s.label });
     } else {
@@ -408,8 +373,6 @@ async function showQuickSettings(): Promise<void> {
     vscode.window.showInformationMessage(s.label + ': ' + newValue);
 }
 
-// ---------- Окно статистики ----------
-
 function showStatistics(): void {
     const panel = vscode.window.createWebviewPanel(
         'commitReminderStats',
@@ -420,7 +383,6 @@ function showStatistics(): void {
     panel.webview.html = getStatsHtml();
 }
 
-// Рисует столбчатую диаграмму из div-ов
 function makeBarChart(labels: (string | number)[], values: number[], color: string): string {
     const max = Math.max(1, ...values);
     let html = '<div class="chart">';
@@ -443,7 +405,6 @@ function getStatsHtml(): string {
     const colorReminders = config.get<string>('chartColorReminders', '#e0a030');
     const colorCommits = config.get<string>('chartColorCommits', '#3fa45b');
 
-    // Данные за последние N дней
     const labels: string[] = [];
     const reminders: number[] = [];
     const commits: number[] = [];
@@ -452,12 +413,11 @@ function getStatsHtml(): string {
         d.setDate(d.getDate() - i);
         const key = dateKey(d);
         const day = stats.days[key];
-        labels.push(key.slice(5)); // ММ-ДД
+        labels.push(key.slice(5));
         reminders.push(day ? day.reminders : 0);
         commits.push(day ? day.commits : 0);
     }
 
-    // Итоги за всё время
     let totalReminders = 0, totalCommits = 0, totalSnoozes = 0, totalClicks = 0;
     for (const key in stats.days) {
         totalReminders += stats.days[key].reminders || 0;
@@ -524,14 +484,10 @@ function getStatsHtml(): string {
 </html>`;
 }
 
-// ---------- Активация плагина ----------
-
-// Вызывается, когда VS Code запускает плагин
 export function activate(context: vscode.ExtensionContext): void {
     extContext = context;
     console.log('Плагин "commit-reminder" активирован');
 
-    // Регистрируем команды из package.json
     context.subscriptions.push(
         vscode.commands.registerCommand('commitReminder.checkNow', () => checkAndRemind(true)),
         vscode.commands.registerCommand('commitReminder.showStatistics', showStatistics),
@@ -556,11 +512,9 @@ export function activate(context: vscode.ExtensionContext): void {
         })
     );
 
-    // Проверка при сохранении файла
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument(() => {
             updateStatusBar();
-            // не чаще одного раза в 2 минуты, чтобы не надоедать
             if (getConfig().get<boolean>('remindOnSave') && Date.now() - lastSaveCheck > 2 * 60 * 1000) {
                 lastSaveCheck = Date.now();
                 checkAndRemind(false);
@@ -568,7 +522,6 @@ export function activate(context: vscode.ExtensionContext): void {
         })
     );
 
-    // Если пользователь поменял настройки — перезапускаем всё
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('commitReminder')) {
@@ -583,7 +536,6 @@ export function activate(context: vscode.ExtensionContext): void {
     checkForNewCommit();
 }
 
-// Вызывается при выключении плагина
 export function deactivate(): void {
     stopTimers();
     if (statusBarItem) {
