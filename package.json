@@ -1,0 +1,235 @@
+{
+  "name": "commit-reminder",
+  "displayName": "Commit Reminder",
+  "description": "Напоминает сделать коммит, если в репозитории накопились незакоммиченные изменения. Собирает статистику и показывает её графиками.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.145.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "commitReminder.checkNow",
+        "title": "Commit Reminder: Проверить сейчас"
+      },
+      {
+        "command": "commitReminder.showStatistics",
+        "title": "Commit Reminder: Показать статистику"
+      },
+      {
+        "command": "commitReminder.quickSettings",
+        "title": "Commit Reminder: Быстрые настройки"
+      },
+      {
+        "command": "commitReminder.openSettings",
+        "title": "Commit Reminder: Открыть все настройки"
+      },
+      {
+        "command": "commitReminder.snooze",
+        "title": "Commit Reminder: Отложить напоминания"
+      },
+      {
+        "command": "commitReminder.toggle",
+        "title": "Commit Reminder: Включить / выключить"
+      },
+      {
+        "command": "commitReminder.resetStatistics",
+        "title": "Commit Reminder: Сбросить статистику"
+      }
+    ],
+    "configuration": {
+      "title": "Commit Reminder",
+      "properties": {
+        "commitReminder.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 1,
+          "description": "Включить напоминания о коммитах."
+        },
+        "commitReminder.intervalMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 600,
+          "order": 2,
+          "description": "Как часто (в минутах) проверять репозиторий."
+        },
+        "commitReminder.minChangedFiles": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "order": 3,
+          "description": "Сколько должно быть изменённых файлов, чтобы появилось напоминание."
+        },
+        "commitReminder.countUntrackedFiles": {
+          "type": "boolean",
+          "default": true,
+          "order": 4,
+          "description": "Считать новые (неотслеживаемые git) файлы как изменённые."
+        },
+        "commitReminder.message": {
+          "type": "string",
+          "default": "У тебя {count} незакоммиченных файлов. Пора сделать коммит!",
+          "order": 5,
+          "description": "Текст напоминания. {count} заменяется на число файлов, {minutes} — на минуты с последнего коммита."
+        },
+        "commitReminder.notificationType": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ],
+          "enumDescriptions": [
+            "Обычное уведомление",
+            "Предупреждение (жёлтое)",
+            "Ошибка (красное)"
+          ],
+          "default": "info",
+          "order": 6,
+          "description": "Вид всплывающего уведомления."
+        },
+        "commitReminder.urgentFilesCount": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "order": 7,
+          "description": "Если изменённых файлов больше этого числа, напоминание всегда показывается как предупреждение."
+        },
+        "commitReminder.showCommitButton": {
+          "type": "boolean",
+          "default": true,
+          "order": 8,
+          "description": "Показывать в уведомлении кнопку «Перейти к коммиту»."
+        },
+        "commitReminder.snoozeMinutes": {
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "order": 9,
+          "description": "На сколько минут откладывать напоминания по кнопке «Отложить»."
+        },
+        "commitReminder.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "order": 10,
+          "description": "Показывать число изменённых файлов в строке состояния."
+        },
+        "commitReminder.statusBarAlignment": {
+          "type": "string",
+          "enum": [
+            "left",
+            "right"
+          ],
+          "default": "left",
+          "order": 11,
+          "description": "С какой стороны строки состояния показывать счётчик."
+        },
+        "commitReminder.statusBarUpdateSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "order": 12,
+          "description": "Как часто (в секундах) обновлять счётчик в строке состояния."
+        },
+        "commitReminder.remindOnSave": {
+          "type": "boolean",
+          "default": false,
+          "order": 13,
+          "description": "Дополнительно проверять репозиторий при каждом сохранении файла."
+        },
+        "commitReminder.workingHoursOnly": {
+          "type": "boolean",
+          "default": false,
+          "order": 14,
+          "description": "Напоминать только в рабочие часы."
+        },
+        "commitReminder.workStartHour": {
+          "type": "number",
+          "default": 9,
+          "minimum": 0,
+          "maximum": 23,
+          "order": 15,
+          "description": "Начало рабочих часов (час, 0–23)."
+        },
+        "commitReminder.workEndHour": {
+          "type": "number",
+          "default": 21,
+          "minimum": 0,
+          "maximum": 23,
+          "order": 16,
+          "description": "Конец рабочих часов (час, 0–23)."
+        },
+        "commitReminder.ignoreWeekends": {
+          "type": "boolean",
+          "default": false,
+          "order": 17,
+          "description": "Не напоминать в субботу и воскресенье."
+        },
+        "commitReminder.collectStatistics": {
+          "type": "boolean",
+          "default": true,
+          "order": 18,
+          "description": "Собирать статистику (напоминания, коммиты, отложенные напоминания)."
+        },
+        "commitReminder.statisticsDays": {
+          "type": "number",
+          "default": 7,
+          "minimum": 1,
+          "maximum": 60,
+          "order": 19,
+          "description": "За сколько последних дней показывать график."
+        },
+        "commitReminder.chartColorReminders": {
+          "type": "string",
+          "default": "#e0a030",
+          "order": 20,
+          "description": "Цвет столбиков «напоминания» на графике (CSS-цвет)."
+        },
+        "commitReminder.chartColorCommits": {
+          "type": "string",
+          "default": "#3fa45b",
+          "order": 21,
+          "description": "Цвет столбиков «коммиты» на графике (CSS-цвет)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.145.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "24.x",
+    "typescript-eslint": "^8.61.1",
+    "eslint": "^10.5.0",
+    "esbuild": "^0.28.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^6.0.3",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  }
+}
